@@ -14,12 +14,13 @@ import {
     getContractAddress,
     hexToBigInt,
     keccak256,
-    parseAbiParameters,
+    pad,
     padBytes,
-    pad
+    parseAbiParameters
 } from "viem"
 import { getChainId, signMessage, signTypedData } from "viem/actions"
 import { getAccountNonce } from "../../actions/public/getAccountNonce"
+import { getSenderAddress } from "../../actions/public/getSenderAddress"
 import type { Prettify } from "../../types"
 import type { EntryPoint } from "../../types/entrypoint"
 import type { ENTRYPOINT_ADDRESS_V07_TYPE } from "../../types/entrypoint"
@@ -36,8 +37,14 @@ import {
     BiconomyExecuteAbi,
     BiconomyInitAbi
 } from "./abi/BiconomySmartAccountV3Abi"
-import { getSenderAddress } from "../../actions/public/getSenderAddress"
-import { CALLTYPE_BATCH, CALLTYPE_SINGLE, EXECTYPE_DEFAULT, MODE_DEFAULT, MODE_PAYLOAD, UNUSED } from "./utils/constants"
+import {
+    CALLTYPE_BATCH,
+    CALLTYPE_SINGLE,
+    EXECTYPE_DEFAULT,
+    MODE_DEFAULT,
+    MODE_PAYLOAD,
+    UNUSED
+} from "./utils/constants"
 
 export type BiconomySmartAccount<
     entryPoint extends ENTRYPOINT_ADDRESS_V07_TYPE,
@@ -116,7 +123,7 @@ const getAccountInitCode = async ({
     if (!owner) throw new Error("Owner account not found")
 
     // Build the validator module install data
-    const moduleInstallData = encodePacked(["address"], [owner]);
+    const moduleInstallData = encodePacked(["address"], [owner])
 
     // Build the account init code
     return encodeFunctionData({
@@ -147,7 +154,11 @@ const getAccountAddress = async <
 }): Promise<Address> => {
     const entryPointVersion = getEntryPointVersion(entryPointAddress)
 
-    const factoryData = await getAccountInitCode({owner, ecdsaValidatorAddress, index})
+    const factoryData = await getAccountInitCode({
+        owner,
+        ecdsaValidatorAddress,
+        index
+    })
 
     // Get the sender address based on the init code
     return getSenderAddress<ENTRYPOINT_ADDRESS_V07_TYPE>(client, {
@@ -301,7 +312,7 @@ export async function signerToBiconomySmartAccount<
                 sender: accountAddress,
                 entryPoint: entryPointAddress,
                 // Review
-                key: BigInt(pad(ecdsaValidatorAddress, {size: 24}))
+                key: BigInt(pad(ecdsaValidatorAddress, { size: 24 }))
             })
         },
 
@@ -381,14 +392,20 @@ export async function signerToBiconomySmartAccount<
                     data: Hex
                 }[]
 
-                const mode = concatHex([EXECTYPE_DEFAULT, CALLTYPE_BATCH, UNUSED, MODE_DEFAULT, MODE_PAYLOAD]);
+                const mode = concatHex([
+                    EXECTYPE_DEFAULT,
+                    CALLTYPE_BATCH,
+                    UNUSED,
+                    MODE_DEFAULT,
+                    MODE_PAYLOAD
+                ])
 
                 return encodeFunctionData({
                     abi: BiconomyExecuteAbi,
                     functionName: "execute",
                     args: [
                         mode,
-                        '0x' // abi.encode(executions) // TODO for args
+                        "0x" // abi.encode(executions) // TODO for args
                     ]
                 })
             }
@@ -398,9 +415,18 @@ export async function signerToBiconomySmartAccount<
                 data: Hex
             }
 
-            const mode = concatHex([EXECTYPE_DEFAULT, CALLTYPE_SINGLE, UNUSED, MODE_DEFAULT, MODE_PAYLOAD]);
+            const mode = concatHex([
+                EXECTYPE_DEFAULT,
+                CALLTYPE_SINGLE,
+                UNUSED,
+                MODE_DEFAULT,
+                MODE_PAYLOAD
+            ])
 
-            const executionCalldata = encodePacked(["address", "uint256", "bytes"], [to, value, data]);
+            const executionCalldata = encodePacked(
+                ["address", "uint256", "bytes"],
+                [to, value, data]
+            )
             // Encode a simple call
             return encodeFunctionData({
                 abi: BiconomyExecuteAbi,
