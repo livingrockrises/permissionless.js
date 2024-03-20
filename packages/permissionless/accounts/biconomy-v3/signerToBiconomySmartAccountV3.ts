@@ -14,11 +14,14 @@ import {
     getContractAddress,
     hexToBigInt,
     keccak256,
-    parseAbiParameters
+    parseAbiParameters,
+    padBytes,
+    pad
 } from "viem"
 import { getChainId, signMessage, signTypedData } from "viem/actions"
 import { getAccountNonce } from "../../actions/public/getAccountNonce"
 import type { Prettify } from "../../types"
+import type { EntryPoint } from "../../types/entrypoint"
 import type { ENTRYPOINT_ADDRESS_V07_TYPE } from "../../types/entrypoint"
 import { getEntryPointVersion } from "../../utils"
 import { getUserOperationHash } from "../../utils/getUserOperationHash"
@@ -33,6 +36,8 @@ import {
     BiconomyExecuteAbi,
     BiconomyInitAbi
 } from "./abi/BiconomySmartAccountV3Abi"
+import { getSenderAddress } from "../../actions/public/getSenderAddress"
+import { CALLTYPE_BATCH, CALLTYPE_SINGLE, EXECTYPE_DEFAULT, MODE_DEFAULT, MODE_PAYLOAD, UNUSED } from "./utils/constants"
 
 export type BiconomySmartAccount<
     entryPoint extends ENTRYPOINT_ADDRESS_V07_TYPE,
@@ -84,9 +89,9 @@ const BICONOMY_ADDRESSES: {
     ACCOUNT_V3_0_LOGIC: Address
     FACTORY_ADDRESS: Address
 } = {
-    R1_VALIDATOR_MODULE: "0x0000001c5b32F37F5beA87BDD5374eB2aC54eA8e",
-    ACCOUNT_V3_0_LOGIC: "0x0000002512019Dafb59528B82CB92D3c5D2423aC",
-    FACTORY_ADDRESS: "0x000000a56Aaca3e9a4C479ea6b6CD0DbcB6634F5"
+    R1_VALIDATOR_MODULE: "0xA957bb79575a1cf17722Cb57057bc42363FA63C9",
+    ACCOUNT_V3_0_LOGIC: "0xCA8C0FE82e6572453fc86de43738Fa0d3379B1E1",
+    FACTORY_ADDRESS: "0x710a4556523120e536e3755eF8dEAd420E2FC0E6"
 }
 
 const BICONOMY_PROXY_CREATION_CODE =
@@ -102,79 +107,53 @@ const BICONOMY_PROXY_CREATION_CODE =
 const getAccountInitCode = async ({
     owner,
     index,
-    ecdsaModuleAddress
+    ecdsaValidatorAddress
 }: {
     owner: Address
     index: bigint
-    ecdsaModuleAddress: Address
+    ecdsaValidatorAddress: Address
 }): Promise<Hex> => {
     if (!owner) throw new Error("Owner account not found")
 
-    // Build the module setup data
-    const ecdsaOwnershipInitData = encodeFunctionData({
-        abi: BiconomyInitAbi,
-        functionName: "initForSmartAccount",
-        args: [owner]
-    })
+    // Build the validator module install data
+    const moduleInstallData = encodePacked(["address"], [owner]);
 
     // Build the account init code
     return encodeFunctionData({
         abi: createAccountAbi,
-        functionName: "deployCounterFactualAccount",
-        args: [ecdsaModuleAddress, ecdsaOwnershipInitData, index]
+        functionName: "createAccount",
+        args: [ecdsaValidatorAddress, moduleInstallData, index]
     })
 }
 
-const getAccountAddress = async ({
+const getAccountAddress = async <
+    entryPoint extends EntryPoint,
+    TTransport extends Transport = Transport,
+    TChain extends Chain | undefined = Chain | undefined
+>({
+    client,
     factoryAddress,
-    accountLogicAddress,
-    fallbackHandlerAddress,
-    ecdsaModuleAddress,
+    ecdsaValidatorAddress,
+    entryPoint: entryPointAddress,
     owner,
     index = 0n
 }: {
+    client: Client<TTransport, TChain>
     factoryAddress: Address
-    accountLogicAddress: Address
-    fallbackHandlerAddress: Address
-    ecdsaModuleAddress: Address
+    ecdsaValidatorAddress: Address
     owner: Address
+    entryPoint: entryPoint
     index?: bigint
 }): Promise<Address> => {
-    // Build the module setup data
-    const ecdsaOwnershipInitData = encodeFunctionData({
-        abi: BiconomyInitAbi,
-        functionName: "initForSmartAccount",
-        args: [owner]
-    })
+    const entryPointVersion = getEntryPointVersion(entryPointAddress)
 
-    // Build account init code
-    const initialisationData = encodeFunctionData({
-        abi: BiconomyInitAbi,
-        functionName: "init",
-        args: [
-            fallbackHandlerAddress,
-            ecdsaModuleAddress,
-            ecdsaOwnershipInitData
-        ]
-    })
+    const factoryData = await getAccountInitCode({owner, ecdsaValidatorAddress, index})
 
-    const deploymentCode = encodePacked(
-        ["bytes", "uint256"],
-        [BICONOMY_PROXY_CREATION_CODE, hexToBigInt(accountLogicAddress)]
-    )
-
-    const salt = keccak256(
-        encodePacked(
-            ["bytes32", "uint256"],
-            [keccak256(encodePacked(["bytes"], [initialisationData])), index]
-        )
-    )
-
-    return getContractAddress({
-        from: factoryAddress,
-        salt,
-        bytecode: deploymentCode,
-        opcode: "CREATE2"
+    // Get the sender address based on the init code
+    return getSenderAddress<ENTRYPOINT_ADDRESS_V07_TYPE>(client, {
+        factory: factoryAddress,
+        factoryData,
+        entryPoint: entryPointAddress as ENTRYPOINT_ADDRESS_V07_TYPE
     })
 }
 
@@ -190,7 +169,7 @@ export type SignerToBiconomySmartAccountParameters<
     factoryAddress?: Address
     accountLogicAddress?: Address
     fallbackHandlerAddress?: Address
-    ecdsaModuleAddress?: Address
+    ecdsaValidatorAddress?: Address
 }>
 
 /**
@@ -201,7 +180,7 @@ export type SignerToBiconomySmartAccountParameters<
  * @param index
  * @param factoryAddress
  * @param accountLogicAddress
- * @param ecdsaModuleAddress
+ * @param ecdsaValidatorAddress
  */
 export async function signerToBiconomySmartAccount<
     entryPoint extends ENTRYPOINT_ADDRESS_V07_TYPE,
@@ -217,9 +196,8 @@ export async function signerToBiconomySmartAccount<
         entryPoint: entryPointAddress,
         index = 0n,
         factoryAddress = BICONOMY_ADDRESSES.FACTORY_ADDRESS,
-        accountLogicAddress = BICONOMY_ADDRESSES.ACCOUNT_V2_0_LOGIC,
-        fallbackHandlerAddress = BICONOMY_ADDRESSES.DEFAULT_FALLBACK_HANDLER_ADDRESS,
-        ecdsaModuleAddress = BICONOMY_ADDRESSES.ECDSA_OWNERSHIP_REGISTRY_MODULE
+        accountLogicAddress = BICONOMY_ADDRESSES.ACCOUNT_V3_0_LOGIC,
+        ecdsaValidatorAddress = BICONOMY_ADDRESSES.R1_VALIDATOR_MODULE
     }: SignerToBiconomySmartAccountParameters<entryPoint, TSource, TAddress>
 ): Promise<BiconomySmartAccount<entryPoint, TTransport, TChain>> {
     const entryPointVersion = getEntryPointVersion(entryPointAddress)
@@ -241,18 +219,18 @@ export async function signerToBiconomySmartAccount<
         getAccountInitCode({
             owner: viemSigner.address,
             index,
-            ecdsaModuleAddress
+            ecdsaValidatorAddress
         })
 
     // Fetch account address and chain id
     const [accountAddress, chainId] = await Promise.all([
         address ??
-            getAccountAddress({
-                owner: viemSigner.address,
-                ecdsaModuleAddress,
+            getAccountAddress<entryPoint, TTransport, TChain>({
+                client,
                 factoryAddress,
-                accountLogicAddress,
-                fallbackHandlerAddress,
+                ecdsaValidatorAddress,
+                entryPoint: entryPointAddress,
+                owner: viemSigner.address,
                 index
             }),
         getChainId(client)
@@ -280,7 +258,7 @@ export async function signerToBiconomySmartAccount<
             }
             return encodeAbiParameters(
                 [{ type: "bytes" }, { type: "address" }],
-                [signature, ecdsaModuleAddress]
+                [signature, ecdsaValidatorAddress]
             )
         },
         async signTransaction(_, __) {
@@ -309,7 +287,7 @@ export async function signerToBiconomySmartAccount<
             }
             return encodeAbiParameters(
                 [{ type: "bytes" }, { type: "address" }],
-                [signature, ecdsaModuleAddress]
+                [signature, ecdsaValidatorAddress]
             )
         },
         client: client,
@@ -321,7 +299,9 @@ export async function signerToBiconomySmartAccount<
         async getNonce() {
             return getAccountNonce(client, {
                 sender: accountAddress,
-                entryPoint: entryPointAddress
+                entryPoint: entryPointAddress,
+                // Review
+                key: BigInt(pad(ecdsaValidatorAddress, {size: 24}))
             })
         },
 
@@ -342,7 +322,7 @@ export async function signerToBiconomySmartAccount<
             // userOp signature is encoded module signature + module address
             const signatureWithModuleAddress = encodeAbiParameters(
                 parseAbiParameters("bytes, address"),
-                [signature, ecdsaModuleAddress]
+                [signature, ecdsaValidatorAddress]
             )
             return signatureWithModuleAddress
         },
@@ -401,13 +381,14 @@ export async function signerToBiconomySmartAccount<
                     data: Hex
                 }[]
 
+                const mode = concatHex([EXECTYPE_DEFAULT, CALLTYPE_BATCH, UNUSED, MODE_DEFAULT, MODE_PAYLOAD]);
+
                 return encodeFunctionData({
                     abi: BiconomyExecuteAbi,
-                    functionName: "executeBatch_y6U",
+                    functionName: "execute",
                     args: [
-                        argsArray.map((a) => a.to),
-                        argsArray.map((a) => a.value),
-                        argsArray.map((a) => a.data)
+                        mode,
+                        '0x' // abi.encode(executions) // TODO for args
                     ]
                 })
             }
@@ -416,20 +397,21 @@ export async function signerToBiconomySmartAccount<
                 value: bigint
                 data: Hex
             }
+
+            const mode = concatHex([EXECTYPE_DEFAULT, CALLTYPE_SINGLE, UNUSED, MODE_DEFAULT, MODE_PAYLOAD]);
+
+            const executionCalldata = encodePacked(["address", "uint256", "bytes"], [to, value, data]);
             // Encode a simple call
             return encodeFunctionData({
                 abi: BiconomyExecuteAbi,
-                functionName: "execute_ncC",
-                args: [to, value, data]
+                functionName: "execute",
+                args: [mode, executionCalldata]
             })
         },
 
         // Get simple dummy signature for ECDSA module authorization
         async getDummySignature(_userOperation) {
-            const moduleAddress =
-                BICONOMY_ADDRESSES.ECDSA_OWNERSHIP_REGISTRY_MODULE
-            const dynamicPart = moduleAddress.substring(2).padEnd(40, "0")
-            return `0x0000000000000000000000000000000000000000000000000000000000000040000000000000000000000000${dynamicPart}000000000000000000000000000000000000000000000000000000000000004181d4b4981670cb18f99f0b4a66446df1bf5b204d24cfcb659bf38ba27a4359b5711649ec2423c5e1247245eba2964679b6a1dbb85c992ae40b9b00c6935b02ff1b00000000000000000000000000000000000000000000000000000000000000`
+            return `0x73c3ac716c487ca34bb858247b5ccf1dc354fbaabdd089af3b2ac8e78ba85a4959a2d76250325bd67c11771c31fccda87c33ceec17cc0de912690521bb95ffcb1b`
         }
     })
 }
