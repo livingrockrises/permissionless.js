@@ -2,17 +2,17 @@ import { type Chain, type Client, type Hex, type Transport } from "viem"
 import { privateKeyToAccount } from "viem/accounts"
 import type { ENTRYPOINT_ADDRESS_V07_TYPE, Prettify } from "../../types"
 import {
-    type BiconomySmartAccount,
-    type SignerToBiconomySmartAccountParameters,
-    signerToBiconomySmartAccount
+    type BiconomySmartAccountV3,
+    type SignerToBiconomySmartAccountV3Parameters,
+    signerToBiconomySmartAccountV3
 } from "./signerToBiconomySmartAccountV3"
 
-export type PrivateKeyToBiconomySmartAccountParameters<
+export type PrivateKeyToBiconomySmartAccountV3Parameters<
     entryPoint extends ENTRYPOINT_ADDRESS_V07_TYPE
 > = Prettify<
     {
         privateKey: Hex
-    } & Omit<SignerToBiconomySmartAccountParameters<entryPoint>, "signer">
+    } & Omit<SignerToBiconomySmartAccountV3Parameters<entryPoint>, "signer">
 >
 
 /**
@@ -20,7 +20,7 @@ export type PrivateKeyToBiconomySmartAccountParameters<
  *
  * @returns A Private Key Biconomy Smart Account using ECDSA as default validation module.
  */
-export async function privateKeyToBiconomySmartAccount<
+export async function privateKeyToBiconomySmartAccountV3<
     entryPoint extends ENTRYPOINT_ADDRESS_V07_TYPE,
     TTransport extends Transport = Transport,
     TChain extends Chain | undefined = Chain | undefined
@@ -29,10 +29,10 @@ export async function privateKeyToBiconomySmartAccount<
     {
         privateKey,
         ...rest
-    }: PrivateKeyToBiconomySmartAccountParameters<entryPoint>
-): Promise<BiconomySmartAccount<entryPoint, TTransport, TChain>> {
+    }: PrivateKeyToBiconomySmartAccountV3Parameters<entryPoint>
+): Promise<BiconomySmartAccountV3<entryPoint, TTransport, TChain>> {
     const privateKeyAccount = privateKeyToAccount(privateKey)
-    return signerToBiconomySmartAccount<
+    return signerToBiconomySmartAccountV3<
         entryPoint,
         TTransport,
         TChain,

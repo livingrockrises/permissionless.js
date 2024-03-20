@@ -6,6 +6,7 @@ import {
 import {
     SmartAccount,
     SmartAccountSigner,
+    signerToBiconomySmartAccountV3,
     signerToSimpleSmartAccount
 } from "permissionless/accounts"
 import { Middleware } from "permissionless/actions/smartAccount"
@@ -92,6 +93,22 @@ export const getSignerToSimpleSmartAccount = async ({
         factoryAddress: getFactoryAddress(),
         signer: signer,
         address,
+        index: index
+    })
+}
+
+export const getSignerToBiconomySmartAccountV3 = async (
+    { index }: { index: bigint } = { index: 0n }
+) => {
+    if (!process.env.TEST_PRIVATE_KEY)
+        throw new Error("TEST_PRIVATE_KEY environment variable not set")
+
+    const publicClient = await getPublicClient()
+    const signer = privateKeyToAccount(process.env.TEST_PRIVATE_KEY as Hex)
+
+    return await signerToBiconomySmartAccountV3(publicClient, {
+        entryPoint: getEntryPoint(),
+        signer: signer,
         index: index
     })
 }

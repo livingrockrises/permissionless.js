@@ -11,11 +11,7 @@ import {
     encodeAbiParameters,
     encodeFunctionData,
     encodePacked,
-    getContractAddress,
-    hexToBigInt,
-    keccak256,
     pad,
-    padBytes,
     parseAbiParameters
 } from "viem"
 import { getChainId, signMessage, signTypedData } from "viem/actions"
@@ -24,7 +20,6 @@ import { getSenderAddress } from "../../actions/public/getSenderAddress"
 import type { Prettify } from "../../types"
 import type { EntryPoint } from "../../types/entrypoint"
 import type { ENTRYPOINT_ADDRESS_V07_TYPE } from "../../types/entrypoint"
-import { getEntryPointVersion } from "../../utils"
 import { getUserOperationHash } from "../../utils/getUserOperationHash"
 import { isSmartAccountDeployed } from "../../utils/isSmartAccountDeployed"
 import { toSmartAccount } from "../toSmartAccount"
@@ -35,7 +30,6 @@ import {
 } from "../types"
 import {
     BiconomyExecuteAbi,
-    BiconomyInitAbi
 } from "./abi/BiconomySmartAccountV3Abi"
 import {
     CALLTYPE_BATCH,
@@ -46,11 +40,12 @@ import {
     UNUSED
 } from "./utils/constants"
 
-export type BiconomySmartAccount<
+export type BiconomySmartAccountV3<
     entryPoint extends ENTRYPOINT_ADDRESS_V07_TYPE,
     transport extends Transport = Transport,
     chain extends Chain | undefined = Chain | undefined
-> = SmartAccount<entryPoint, "biconomySmartAccount", transport, chain>
+> = SmartAccount<entryPoint, "biconomySmartAccountV3", transport, chain>
+
 
 /**
  * The account creation ABI for Biconomy Smart Account (from the biconomy SmartAccountFactory)
@@ -101,9 +96,6 @@ const BICONOMY_ADDRESSES: {
     FACTORY_ADDRESS: "0x710a4556523120e536e3755eF8dEAd420E2FC0E6"
 }
 
-const BICONOMY_PROXY_CREATION_CODE =
-    "0x6080346100aa57601f61012038819003918201601f19168301916001600160401b038311848410176100af578084926020946040528339810103126100aa57516001600160a01b0381168082036100aa5715610065573055604051605a90816100c68239f35b60405162461bcd60e51b815260206004820152601e60248201527f496e76616c696420696d706c656d656e746174696f6e206164647265737300006044820152606490fd5b600080fd5b634e487b7160e01b600052604160045260246000fdfe608060405230546000808092368280378136915af43d82803e156020573d90f35b3d90fdfea2646970667358221220a03b18dce0be0b4c9afe58a9eb85c35205e2cf087da098bbf1d23945bf89496064736f6c63430008110033"
-
 /**
  * Get the account initialization code for Biconomy smart account with ECDSA as default authorization module
  * @param owner
@@ -152,8 +144,6 @@ const getAccountAddress = async <
     entryPoint: entryPoint
     index?: bigint
 }): Promise<Address> => {
-    const entryPointVersion = getEntryPointVersion(entryPointAddress)
-
     const factoryData = await getAccountInitCode({
         owner,
         ecdsaValidatorAddress,
@@ -168,7 +158,7 @@ const getAccountAddress = async <
     })
 }
 
-export type SignerToBiconomySmartAccountParameters<
+export type SignerToBiconomySmartAccountV3Parameters<
     entryPoint extends ENTRYPOINT_ADDRESS_V07_TYPE,
     TSource extends string = string,
     TAddress extends Address = Address
@@ -178,8 +168,6 @@ export type SignerToBiconomySmartAccountParameters<
     address?: Address
     index?: bigint
     factoryAddress?: Address
-    accountLogicAddress?: Address
-    fallbackHandlerAddress?: Address
     ecdsaValidatorAddress?: Address
 }>
 
@@ -193,7 +181,7 @@ export type SignerToBiconomySmartAccountParameters<
  * @param accountLogicAddress
  * @param ecdsaValidatorAddress
  */
-export async function signerToBiconomySmartAccount<
+export async function signerToBiconomySmartAccountV3<
     entryPoint extends ENTRYPOINT_ADDRESS_V07_TYPE,
     TTransport extends Transport = Transport,
     TChain extends Chain | undefined = Chain | undefined,
@@ -207,16 +195,9 @@ export async function signerToBiconomySmartAccount<
         entryPoint: entryPointAddress,
         index = 0n,
         factoryAddress = BICONOMY_ADDRESSES.FACTORY_ADDRESS,
-        accountLogicAddress = BICONOMY_ADDRESSES.ACCOUNT_V3_0_LOGIC,
         ecdsaValidatorAddress = BICONOMY_ADDRESSES.R1_VALIDATOR_MODULE
-    }: SignerToBiconomySmartAccountParameters<entryPoint, TSource, TAddress>
-): Promise<BiconomySmartAccount<entryPoint, TTransport, TChain>> {
-    const entryPointVersion = getEntryPointVersion(entryPointAddress)
-
-    if (entryPointVersion !== "v0.6") {
-        throw new Error("Only EntryPoint 0.6 is supported")
-    }
-
+    }: SignerToBiconomySmartAccountV3Parameters<entryPoint, TSource, TAddress>
+): Promise<BiconomySmartAccountV3<entryPoint, TTransport, TChain>> {
     // Get the private key related account
     const viemSigner: LocalAccount = {
         ...signer,
@@ -304,7 +285,7 @@ export async function signerToBiconomySmartAccount<
         client: client,
         publicKey: accountAddress,
         entryPoint: entryPointAddress,
-        source: "biconomySmartAccount",
+        source: "biconomySmartAccountV3",
 
         // Get the nonce of the smart account
         async getNonce() {
@@ -391,6 +372,8 @@ export async function signerToBiconomySmartAccount<
                     value: bigint
                     data: Hex
                 }[]
+
+                console.log('argsArray', argsArray)
 
                 const mode = concatHex([
                     EXECTYPE_DEFAULT,
