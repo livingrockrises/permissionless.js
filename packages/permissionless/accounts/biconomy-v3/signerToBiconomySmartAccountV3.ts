@@ -46,34 +46,34 @@ export type BiconomySmartAccount<
 
 const createAccountAbi = [
     {
-        "inputs": [
-          {
-            "internalType": "address",
-            "name": "validationModule",
-            "type": "address"
-          },
-          {
-            "internalType": "bytes",
-            "name": "moduleInstallData",
-            "type": "bytes"
-          },
-          {
-            "internalType": "uint256",
-            "name": "index",
-            "type": "uint256"
-          }
+        inputs: [
+            {
+                internalType: "address",
+                name: "validationModule",
+                type: "address"
+            },
+            {
+                internalType: "bytes",
+                name: "moduleInstallData",
+                type: "bytes"
+            },
+            {
+                internalType: "uint256",
+                name: "index",
+                type: "uint256"
+            }
         ],
-        "name": "createAccount",
-        "outputs": [
-          {
-            "internalType": "address payable",
-            "name": "",
-            "type": "address"
-          }
+        name: "createAccount",
+        outputs: [
+            {
+                internalType: "address payable",
+                name: "",
+                type: "address"
+            }
         ],
-        "stateMutability": "payable",
-        "type": "function"
-      },
+        stateMutability: "payable",
+        type: "function"
+    }
 ] as const
 
 /**
@@ -84,10 +84,9 @@ const BICONOMY_ADDRESSES: {
     ACCOUNT_V3_0_LOGIC: Address
     FACTORY_ADDRESS: Address
 } = {
-    R1_VALIDATOR_MODULE:
-        "0x0000001c5b32F37F5beA87BDD5374eB2aC54eA8e",
+    R1_VALIDATOR_MODULE: "0x0000001c5b32F37F5beA87BDD5374eB2aC54eA8e",
     ACCOUNT_V3_0_LOGIC: "0x0000002512019Dafb59528B82CB92D3c5D2423aC",
-    FACTORY_ADDRESS: "0x000000a56Aaca3e9a4C479ea6b6CD0DbcB6634F5",
+    FACTORY_ADDRESS: "0x000000a56Aaca3e9a4C479ea6b6CD0DbcB6634F5"
 }
 
 const BICONOMY_PROXY_CREATION_CODE =
