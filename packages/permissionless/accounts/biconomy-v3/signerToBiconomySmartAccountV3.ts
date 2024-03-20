@@ -28,9 +28,7 @@ import {
     type SmartAccount,
     type SmartAccountSigner
 } from "../types"
-import {
-    BiconomyExecuteAbi,
-} from "./abi/BiconomySmartAccountV3Abi"
+import { BiconomyExecuteAbi } from "./abi/BiconomySmartAccountV3Abi"
 import {
     CALLTYPE_BATCH,
     CALLTYPE_SINGLE,
@@ -45,7 +43,6 @@ export type BiconomySmartAccountV3<
     transport extends Transport = Transport,
     chain extends Chain | undefined = Chain | undefined
 > = SmartAccount<entryPoint, "biconomySmartAccountV3", transport, chain>
-
 
 /**
  * The account creation ABI for Biconomy Smart Account (from the biconomy SmartAccountFactory)
@@ -373,7 +370,7 @@ export async function signerToBiconomySmartAccountV3<
                     data: Hex
                 }[]
 
-                console.log('argsArray', argsArray)
+                console.log("argsArray", argsArray)
 
                 const mode = concatHex([
                     EXECTYPE_DEFAULT,

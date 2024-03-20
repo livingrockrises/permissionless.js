@@ -27,8 +27,8 @@ import {
     getPimlicoBundlerClient,
     getPimlicoPaymasterClient,
     getPrivateKeyAccount,
-    getSignerToBiconomySmartAccountV3,
     getPublicClient,
+    getSignerToBiconomySmartAccountV3,
     getSmartAccountClient,
     getTestingChain,
     refillSmartAccount,
@@ -64,7 +64,7 @@ describe("Biconomy 7579 Account", () => {
     test("Biconomy Modular Smart Account address", async () => {
         const biconomyModularSA = await getSignerToBiconomySmartAccountV3()
 
-        console.log('account address ', biconomyModularSA.address);
+        console.log("account address ", biconomyModularSA.address)
 
         expectTypeOf(biconomyModularSA.address).toBeString()
         expect(biconomyModularSA.address).toHaveLength(42)
