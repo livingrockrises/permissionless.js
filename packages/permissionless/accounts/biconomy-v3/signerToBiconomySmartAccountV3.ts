@@ -84,13 +84,13 @@ const createAccountAbi = [
  * Default addresses for Biconomy Smart Account
  */
 const BICONOMY_ADDRESSES: {
-    R1_VALIDATOR_MODULE: Address
+    K1_VALIDATOR_MODULE: Address
     ACCOUNT_V3_0_LOGIC: Address
     FACTORY_ADDRESS: Address
 } = {
-    R1_VALIDATOR_MODULE: "0xA957bb79575a1cf17722Cb57057bc42363FA63C9",
-    ACCOUNT_V3_0_LOGIC: "0xCA8C0FE82e6572453fc86de43738Fa0d3379B1E1",
-    FACTORY_ADDRESS: "0x710a4556523120e536e3755eF8dEAd420E2FC0E6"
+    K1_VALIDATOR_MODULE: "0x7f0368d075179a7a807aA4eBd51241B7d2761A02",
+    ACCOUNT_V3_0_LOGIC: "0x26A1fe54198494Ba1a1aaD2D5E8255E91674C539",
+    FACTORY_ADDRESS: "0x7769425B703A3c6AC8BbA33d0afd8eF94763DA2E"
 }
 
 /**
@@ -192,7 +192,7 @@ export async function signerToBiconomySmartAccountV3<
         entryPoint: entryPointAddress,
         index = 0n,
         factoryAddress = BICONOMY_ADDRESSES.FACTORY_ADDRESS,
-        ecdsaValidatorAddress = BICONOMY_ADDRESSES.R1_VALIDATOR_MODULE
+        ecdsaValidatorAddress = BICONOMY_ADDRESSES.K1_VALIDATOR_MODULE
     }: SignerToBiconomySmartAccountV3Parameters<entryPoint, TSource, TAddress>
 ): Promise<BiconomySmartAccountV3<entryPoint, TTransport, TChain>> {
     // Get the private key related account
